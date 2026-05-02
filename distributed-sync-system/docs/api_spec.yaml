@@ -1,0 +1,404 @@
+openapi: 3.0.0
+info:
+  title: Distributed Synchronization System API
+  version: 1.0.0
+  description: API untuk Distributed Lock Manager, Queue, dan Cache
+
+servers:
+  - url: http://localhost:5000
+    description: Node 1
+  - url: http://localhost:5001
+    description: Node 2
+  - url: http://localhost:5002
+    description: Node 3
+
+tags:
+  - name: Health
+    description: System health and status
+  - name: Lock
+    description: Distributed lock operations
+  - name: Queue
+    description: Distributed queue operations
+  - name: Cache
+    description: Distributed cache operations
+  - name: Raft
+    description: Raft consensus operations
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  node_id:
+                    type: string
+                  timestamp:
+                    type: number
+
+  /status:
+    get:
+      tags:
+        - Health
+      summary: Get node status
+      responses:
+        '200':
+          description: Node status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  node_id:
+                    type: string
+                  state:
+                    type: string
+                    enum: [follower, candidate, leader]
+                  term:
+                    type: integer
+                  leader_id:
+                    type: string
+                  alive_nodes:
+                    type: array
+                    items:
+                      type: string
+                  dead_nodes:
+                    type: array
+                    items:
+                      type: string
+
+  /locks/acquire:
+    post:
+      tags:
+        - Lock
+      summary: Acquire a lock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - resource_id
+                - lock_type
+                - transaction_id
+              properties:
+                resource_id:
+                  type: string
+                  description: Resource identifier
+                lock_type:
+                  type: string
+                  enum: [exclusive, shared]
+                  description: Type of lock
+                transaction_id:
+                  type: string
+                  description: Transaction identifier
+                client_id:
+                  type: string
+                  description: Client identifier
+                timeout:
+                  type: number
+                  default: 30
+                  description: Lock timeout in seconds
+      responses:
+        '200':
+          description: Lock acquired or waiting
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [granted, waiting, denied]
+                  lock_id:
+                    type: string
+                  message:
+                    type: string
+
+  /locks/release:
+    post:
+      tags:
+        - Lock
+      summary: Release a lock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - resource_id
+                - transaction_id
+              properties:
+                resource_id:
+                  type: string
+                transaction_id:
+                  type: string
+      responses:
+        '200':
+          description: Lock released
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /locks/status:
+    get:
+      tags:
+        - Lock
+      summary: Get lock status
+      responses:
+        '200':
+          description: Lock status information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_locks:
+                    type: integer
+                  locked_resources:
+                    type: integer
+                  waiting_requests:
+                    type: integer
+                  transactions_active:
+                    type: integer
+
+  /queue/enqueue:
+    post:
+      tags:
+        - Queue
+      summary: Enqueue message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - queue_name
+                - message
+              properties:
+                queue_name:
+                  type: string
+                message:
+                  type: object
+                producer_id:
+                  type: string
+      responses:
+        '200':
+          description: Message enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message_id:
+                    type: string
+                  status:
+                    type: string
+
+  /queue/dequeue:
+    post:
+      tags:
+        - Queue
+      summary: Dequeue message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - queue_name
+                - consumer_id
+              properties:
+                queue_name:
+                  type: string
+                consumer_id:
+                  type: string
+                timeout:
+                  type: number
+                  default: 5
+      responses:
+        '200':
+          description: Message dequeued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message_id:
+                    type: string
+                  content:
+                    type: object
+                  producer_id:
+                    type: string
+
+  /cache/get:
+    get:
+      tags:
+        - Cache
+      summary: Get value from cache
+      parameters:
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cache value
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  value:
+                    type: object
+                  state:
+                    type: string
+                  hit:
+                    type: boolean
+
+  /cache/put:
+    post:
+      tags:
+        - Cache
+      summary: Put value to cache
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - key
+                - value
+              properties:
+                key:
+                  type: string
+                value:
+                  type: object
+      responses:
+        '200':
+          description: Value cached
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /cache/status:
+    get:
+      tags:
+        - Cache
+      summary: Get cache status
+      responses:
+        '200':
+          description: Cache status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cache_size:
+                    type: integer
+                  max_capacity:
+                    type: integer
+                  hit_rate:
+                    type: string
+                  state_distribution:
+                    type: object
+
+  /raft/append-entries:
+    post:
+      tags:
+        - Raft
+      summary: Append entries RPC
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                term:
+                  type: integer
+                leader_id:
+                  type: string
+                prev_log_index:
+                  type: integer
+                prev_log_term:
+                  type: integer
+                entries:
+                  type: array
+                leader_commit:
+                  type: integer
+      responses:
+        '200':
+          description: RPC response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  term:
+                    type: integer
+                  success:
+                    type: boolean
+
+  /raft/request-vote:
+    post:
+      tags:
+        - Raft
+      summary: Request vote RPC
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                term:
+                  type: integer
+                candidate_id:
+                  type: string
+                last_log_index:
+                  type: integer
+                last_log_term:
+                  type: integer
+      responses:
+        '200':
+          description: Vote response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  term:
+                    type: integer
+                  vote_granted:
+                    type: boolean

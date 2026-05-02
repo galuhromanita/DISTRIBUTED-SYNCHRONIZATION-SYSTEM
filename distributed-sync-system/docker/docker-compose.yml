@@ -1,0 +1,134 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  node-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    container_name: distributed-sync-node-1
+    ports:
+      - "5001:5000"
+      - "8001:8000"
+    environment:
+      NODE_ID: node-1
+      NODE_HOST: node-1
+      NODE_PORT: 5000
+      CLUSTER_NAME: distributed-cluster
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      LOG_LEVEL: INFO
+    depends_on:
+      - redis
+    networks:
+      - distributed-network
+    volumes:
+      - node_1_data:/app/data
+
+  node-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    container_name: distributed-sync-node-2
+    ports:
+      - "5002:5000"
+      - "8002:8000"
+    environment:
+      NODE_ID: node-2
+      NODE_HOST: node-2
+      NODE_PORT: 5000
+      CLUSTER_NAME: distributed-cluster
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      LOG_LEVEL: INFO
+    depends_on:
+      - redis
+    networks:
+      - distributed-network
+    volumes:
+      - node_2_data:/app/data
+
+  node-3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    container_name: distributed-sync-node-3
+    ports:
+      - "5003:5000"
+      - "8003:8000"
+    environment:
+      NODE_ID: node-3
+      NODE_HOST: node-3
+      NODE_PORT: 5000
+      CLUSTER_NAME: distributed-cluster
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      LOG_LEVEL: INFO
+    depends_on:
+      - redis
+    networks:
+      - distributed-network
+    volumes:
+      - node_3_data:/app/data
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: distributed-sync-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+    networks:
+      - distributed-network
+    depends_on:
+      - node-1
+      - node-2
+      - node-3
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      set -eu
+      mkdir -p /etc/prometheus
+      printf "%s" "global:\n  scrape_interval: 5s\nscrape_configs:\n  - job_name: 'distributed-sync-nodes'\n    metrics_path: /metrics\n    static_configs:\n      - targets: ['node-1:8000','node-2:8000','node-3:8000']\n" > /etc/prometheus/prometheus.yml
+      exec /bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/prometheus \
+        --storage.tsdb.retention.time=24h
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: distributed-sync-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - distributed-network
+    depends_on:
+      - prometheus
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      set -eu
+      mkdir -p /etc/grafana/provisioning/datasources
+      printf "%s" "apiVersion: 1\ndatasources:\n  - name: Prometheus\n    type: prometheus\n    access: proxy\n    url: http://prometheus:9090\n    isDefault: true\n" > /etc/grafana/provisioning/datasources/datasource.yml
+      exec /run.sh
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  node_1_data:
+  node_2_data:
+  node_3_data:
+
+networks:
+  distributed-network:
+    driver: bridge

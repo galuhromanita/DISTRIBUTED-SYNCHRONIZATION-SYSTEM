@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+
+# Docker data volumes (tidak perlu di-push)
+data/
+
+# Logs
+*.log
+logs/
+
+# Environment files (jangan push secrets)
+.env
+!.env.example
+
+# Node modules (jika ada)
+node_modules/
+
+# OS
+Thumbs.db
