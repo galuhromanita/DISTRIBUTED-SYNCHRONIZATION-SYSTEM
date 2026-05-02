@@ -157,7 +157,7 @@ Expected (contoh):
 }
 ```
 
-#### ✅ Consumer (dequeue dari node lain)
+#### Consumer (dequeue dari node lain)
 
 ```powershell
 curl.exe "http://localhost:8002/queue"
